@@ -34,10 +34,10 @@ import {
   assertValidSchema,
 } from "graphql";
 
-const defaultFieldResolver = (parent, params, ctx, resolveInfo) => [
-  resolveInfo.fieldNodes[0],
-  (selections) => selections,
-];
+const defaultMetadataResolver = (parent, params, ctx, resolveInfo) =>
+  resolveInfo.fieldNodes[0];
+const defaultFieldResolver = ({ children }, params, ctx, resolveInfo) =>
+  children;
 
 type ObjMap<T> = { [key: string]: T };
 
@@ -254,8 +254,10 @@ function resolveField(
   const returnType = fieldDef.type;
   // Changed resolve function to extensions.resolveToCypherAst
   // Can still feed in a default resolveToCypher through exeContext under fieldResolver.
+  const metadataFn =
+    fieldDef.extensions.cypher.resolveMetadata ?? defaultMetadataResolver;
   const resolveFn =
-    fieldDef.extensions.resolveToCypherAst ?? exeContext.fieldResolver;
+    fieldDef.extensions.cypher.resolveToAst ?? exeContext.fieldResolver;
 
   const info = buildResolveInfo(
     exeContext,
@@ -283,25 +285,32 @@ function resolveField(
 
     // resolveToCypher returns a function with signature:
     // CypherResolverResult :: (selectionSet: QueryBuilder[]) => result: QueryBuilder
-    const [fieldMetadata, resolveToCypher] = resolveFn(
-      source,
+    const fieldMetadata = metadataFn(
+      { parent: source?.parent }, // is
       args,
       contextValue,
       info
     );
 
     // completeValue will need to be tweaked slightly and will have function signature:
-    // (...currentArgTypes) => { [subfield: string]: QueryBuilder }
+    // (...currentArgTypes) => { [subfield: string]: { fieldMetadata: {[key: string]: any}, astNode: QueryBuilder} }
     const selections = completeValue(
       exeContext,
       returnType,
       fieldNodes,
       info,
       path,
-      fieldMetadata // This can be changed to appropriate parent metadata.
-      // Becomes `parent` argument of subfield's resolveFn(parent, params, ctx, resolveInfo)
+      { parent: fieldMetadata } // Becomes `parent` argument of subfield's resolveFn(parent, params, ctx, resolveInfo)
     );
-    return resolveToCypher(Object.entries(selections));
+
+    const astNode = resolveFn(
+      { parent: source?.parent, self: fieldMetadata, children: selections },
+      args,
+      contextValue,
+      info
+    );
+
+    return { fieldMetadata, astNode };
   } catch (rawError) {
     const error = locatedError(rawError, fieldNodes, pathToArray(path));
     return handleFieldError(error, returnType, exeContext);
@@ -539,10 +548,24 @@ function _collectSubfields(
   const visitedFragmentNames = Object.create(null);
   for (const node of fieldNodes) {
     if (node.selectionSet) {
+      // Filter selections to account for selectionSets from Interface/Union fieldNodes.
+      const selections = node.selectionSet.selections.filter(
+        (selectionNode) => {
+          return (
+            selectionNode.kind === "FragmentSpread" ||
+            selectionNode.kind === "InlineFragment" ||
+            (selectionNode.kind === "Field" &&
+              returnType.getFields()[selectionNode.name.value])
+          );
+        }
+      );
       subFieldNodes = collectFields(
         exeContext,
         returnType,
-        node.selectionSet,
+        {
+          ...node.selectionSet,
+          selections,
+        },
         subFieldNodes,
         visitedFragmentNames
       );

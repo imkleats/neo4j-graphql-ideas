@@ -31,7 +31,7 @@ const sdl = `
   directive @relationship(name: String!, direction: String!) on FIELD_DEFINITION
   `;
 
-const schema = buildASTSchema(parse(sdl));
+let schema = buildASTSchema(parse(sdl));
 const queryType = schema.getType("Query");
 const queryDefinitionFields = isObjectType(queryType) && queryType.getFields();
 queryDefinitionFields.testRelation["resolve"] = function (
@@ -43,7 +43,7 @@ queryDefinitionFields.testRelation["resolve"] = function (
   return mockTest;
 };
 
-applyNeo4jExtensions(schema, {});
+schema = applyNeo4jExtensions(schema, {});
 const query = `
   query { 
       testRelation { 
@@ -67,5 +67,5 @@ if (isPromise(cypher)) {
   });
 } else {
   console.log(JSON.stringify(cypher.data, null, 2));
-  console.log(cypher.data.testRelation.queryString);
+  console.log(cypher.data.testRelation.astNode.queryString);
 }

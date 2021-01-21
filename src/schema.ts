@@ -9,28 +9,44 @@ import {
   QueryObjectTypeResolver,
   ObjectTypeResolver,
   LeafTypeResolver,
+  LeafTypeMetadataResolver,
+  ObjectTypeMetadataResolver,
+  QueryObjectTypeMetadataResolver,
 } from "./resolvers";
 
 export const applyFieldCypherAstResolver = (
   schema: GraphQLSchema,
   parentType: GraphQLObjectType,
   field: GraphQLField<any, any>
-): Function => {
+): { [key: string]: Function } => {
   const fieldType = getNamedType(field.type);
   const safeType = fieldType.name[0].toLowerCase() + fieldType.name.slice(1);
   // parentType is Query
   if (parentType === schema.getQueryType()) {
     // need to branch between ObjectType & LeafType
-    return QueryObjectTypeResolver(schema, parentType, field);
+    return {
+      resolveToAst: QueryObjectTypeResolver(schema, parentType, field),
+      resolveMetaData: QueryObjectTypeMetadataResolver(
+        schema,
+        parentType,
+        field
+      ),
+    };
   }
   // parentType is Mutation
   if (parentType === schema.getMutationType()) {
   }
   if (isObjectType(fieldType)) {
     // TODO: need to branch between ObjectType & LeafType
-    return ObjectTypeResolver(schema, parentType, field);
+    return {
+      resolveToAst: ObjectTypeResolver(schema, parentType, field),
+      resolveMetaData: ObjectTypeMetadataResolver(schema, parentType, field),
+    };
   }
-  return LeafTypeResolver(schema, parentType, field);
+  return {
+    resolveToAst: LeafTypeResolver(schema, parentType, field),
+    resolveMetaData: LeafTypeMetadataResolver(schema, parentType, field),
+  };
 };
 
 export const applyObjectCypherAstResolver = (
@@ -55,7 +71,7 @@ export const applyObjectCypherAstResolver = (
     };
     field.extensions = {
       ...field.extensions,
-      resolveToCypherAst: applyFieldCypherAstResolver(schema, namedType, field),
+      cypher: applyFieldCypherAstResolver(schema, namedType, field),
     };
   });
 };
@@ -78,4 +94,5 @@ export const applyNeo4jExtensions = (
         userConfig[namedType.name]
       );
     });
+  return schema;
 };
