@@ -9,12 +9,13 @@ const relatedField = {
 };
 
 const mockTest = {
+  __typename: "Test",
   someField: "Test Object - someField",
   relatedField,
 };
 
 const sdl = `
-  type Test {
+  type Test implements ITest {
     someField: String
     relatedField: Related @relationship(name: "RELATED" direction: "OUT")
   }
@@ -24,8 +25,18 @@ const sdl = `
     value: Int
   }
   
+  interface ITest {
+    someField: String
+  }
+
+  type InterfacedTest implements ITest {
+    someField: String
+    otherField: Int
+  }
+
   type Query {
     testRelation: Test
+    testInterface: ITest
   }
   
   directive @relationship(name: String!, direction: String!) on FIELD_DEFINITION
@@ -46,7 +57,7 @@ queryDefinitionFields.testRelation["resolve"] = function (
 schema = applyNeo4jExtensions(schema, {});
 const query = `
   query { 
-      testRelation { 
+      testInterface { 
           someField
           relatedField { 
               name
@@ -63,9 +74,9 @@ const cypher = translate({
 if (isPromise(cypher)) {
   cypher.then((translation) => {
     console.log(JSON.stringify(translation.data, null, 2));
-    console.log(translation.data.testRelation.queryString);
+    console.log(translation.data.testInterface.astNode.queryString);
   });
 } else {
   console.log(JSON.stringify(cypher.data, null, 2));
-  console.log(cypher.data.testRelation.astNode.queryString);
+  console.log(cypher.data.testInterface.astNode.queryString);
 }

@@ -415,33 +415,20 @@ function completeAbstractValue(
   path: Path,
   result: any
 ): PromiseOrValue<ObjMap<any>> {
-  // We don't need to figure out a runtimeType, but we may need to treat
-  // fragment spreads as subqueries in a way that requires a different
-  // `collectAndExecuteSubfields` implementation.
-  // Ideas: - result could hold different information for each possible Type?
-
-  // Don't need to change to extensions.resolveToCypher
-
-  const resolveTypeFn = returnType.resolveType ?? exeContext.typeResolver;
-  const contextValue = exeContext.contextValue;
-  const runtimeTypeOrName = resolveTypeFn(
-    result,
-    contextValue,
-    info,
-    returnType
-  );
-  const runtimeTypeName: string = isNamedType(runtimeTypeOrName)
-    ? runtimeTypeOrName.name
-    : (runtimeTypeOrName as string);
-
-  return completeObjectValue(
-    exeContext,
-    exeContext.schema.getType(runtimeTypeName) as GraphQLObjectType,
-    fieldNodes,
-    info,
-    path,
-    result
-  );
+  // Return subselections keyed by concrete type. Interface/Union ast resolvers
+  // will have to treat their selections accordingly.
+  const possibleTypes = info.schema.getPossibleTypes(returnType);
+  return possibleTypes.reduce((typeMap, objectType) => {
+    typeMap[objectType.name] = completeObjectValue(
+      exeContext,
+      objectType,
+      fieldNodes,
+      info,
+      path,
+      result
+    );
+    return typeMap;
+  }, {});
 }
 
 /**

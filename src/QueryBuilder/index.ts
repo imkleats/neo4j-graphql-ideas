@@ -19,11 +19,16 @@ export const buildRelationship = (
   parentAlias: string,
   field: GraphQLField<unknown, unknown>
 ) => {
-  const { name: relName, direction: relDir } = getDirectiveValues(
+  const relationship = getDirectiveValues(
     schema.getDirective("relationship"),
     field.astNode
   );
-  return `(${parentAlias})${relDir == "IN" ? "<-" : "-"}[:${relName}]${
-    relDir == "OUT" ? "->" : "-"
-  }`;
+  if (relationship) {
+    const { name: relName, direction: relDir } = relationship;
+    return `(${parentAlias})${relDir == "IN" ? "<-" : "-"}[:${relName}]${
+      relDir == "OUT" ? "->" : "-"
+    }`;
+  } else {
+    return "";
+  }
 };

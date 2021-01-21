@@ -4,6 +4,7 @@ import {
   GraphQLField,
   getNamedType,
   isObjectType,
+  isAbstractType,
 } from "graphql";
 import {
   QueryObjectTypeResolver,
@@ -12,6 +13,9 @@ import {
   LeafTypeMetadataResolver,
   ObjectTypeMetadataResolver,
   QueryObjectTypeMetadataResolver,
+  QueryAbstractTypeResolver,
+  AbstractTypeMetadataResolver,
+  AbstractTypeResolver,
 } from "./resolvers";
 
 export const applyFieldCypherAstResolver = (
@@ -24,9 +28,19 @@ export const applyFieldCypherAstResolver = (
   // parentType is Query
   if (parentType === schema.getQueryType()) {
     // need to branch between ObjectType & LeafType
+    if (isAbstractType(fieldType)) {
+      return {
+        resolveToAst: QueryAbstractTypeResolver(schema, parentType, field),
+        resolveMetadata: AbstractTypeMetadataResolver(
+          schema,
+          parentType,
+          field
+        ),
+      };
+    }
     return {
       resolveToAst: QueryObjectTypeResolver(schema, parentType, field),
-      resolveMetaData: QueryObjectTypeMetadataResolver(
+      resolveMetadata: QueryObjectTypeMetadataResolver(
         schema,
         parentType,
         field
@@ -36,16 +50,22 @@ export const applyFieldCypherAstResolver = (
   // parentType is Mutation
   if (parentType === schema.getMutationType()) {
   }
+  if (isAbstractType(fieldType)) {
+    return {
+      resolveToAst: AbstractTypeResolver(schema, parentType, field),
+      resolveMetadata: AbstractTypeMetadataResolver(schema, parentType, field),
+    };
+  }
   if (isObjectType(fieldType)) {
     // TODO: need to branch between ObjectType & LeafType
     return {
       resolveToAst: ObjectTypeResolver(schema, parentType, field),
-      resolveMetaData: ObjectTypeMetadataResolver(schema, parentType, field),
+      resolveMetadata: ObjectTypeMetadataResolver(schema, parentType, field),
     };
   }
   return {
     resolveToAst: LeafTypeResolver(schema, parentType, field),
-    resolveMetaData: LeafTypeMetadataResolver(schema, parentType, field),
+    resolveMetadata: LeafTypeMetadataResolver(schema, parentType, field),
   };
 };
 
@@ -81,18 +101,17 @@ export const applyNeo4jExtensions = (
   userConfig: { [key: string]: any }
 ) => {
   const typeMap = schema.getTypeMap();
-  Object.values(typeMap)
-    .filter((namedType) => isObjectType(namedType))
-    .forEach((namedType: GraphQLObjectType, idx, src) => {
-      // The resolveToCypher function is just one example of possible field on extensions.
-      // It might make sense to have other utility fields or auxilliary functions that will not change
-      // after schema construction. Whether these are stored on the extensions object or curried onto
-      // resolveToCypherAst* is an open choice.
+  Object.values(typeMap).forEach((namedType, idx, src) => {
+    // The resolveToCypher function is just one example of possible field on extensions.
+    // It might make sense to have other utility fields or auxilliary functions that will not change
+    // after schema construction. Whether these are stored on the extensions object or curried onto
+    // resolveToCypherAst* is an open choice.
+    if (isObjectType(namedType))
       applyObjectCypherAstResolver(
         schema,
         namedType,
         userConfig[namedType.name]
       );
-    });
+  });
   return schema;
 };
