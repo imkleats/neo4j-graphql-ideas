@@ -1,6 +1,13 @@
 const MAX_ARRAY_LENGTH = 10;
 const MAX_RECURSIVE_DEPTH = 2;
 
+export function isPromise<T>(value: Promise<T> | T): value is Promise<T> {
+  return (
+    (value as Promise<T>).then !== undefined &&
+    typeof (value as Promise<T>)?.then === "function"
+  );
+}
+
 /**
  * Used to print values in error messages.
  */

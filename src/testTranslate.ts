@@ -1,4 +1,5 @@
-import { buildASTSchema, parse, isObjectType } from "graphql";
+import { buildASTSchema, parse, isObjectType, ExecutionResult } from "graphql";
+import { isPromise } from "./utils/jsutils";
 import { applyNeo4jExtensions } from "./schema";
 import { translate } from "./translate";
 
@@ -58,7 +59,13 @@ const cypher = translate({
   schema,
   document: parse(query),
 });
-// @ts-ignore
-console.log(JSON.stringify(cypher!.data, null, 2));
-// @ts-ignore
-console.log(cypher.data.testRelation.queryString);
+
+if (isPromise(cypher)) {
+  cypher.then((translation) => {
+    console.log(JSON.stringify(translation.data, null, 2));
+    console.log(translation.data.testRelation.queryString);
+  });
+} else {
+  console.log(JSON.stringify(cypher.data, null, 2));
+  console.log(cypher.data.testRelation.queryString);
+}
