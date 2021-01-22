@@ -2,7 +2,9 @@
 
 Staging and demonstration area for some ideas for `@neo4j/graphql` library.
 
-### Model `translate` from `graphql/execution/execute`
+## Modeling `translate` from `graphql/execution/execute`
+
+### Subtitled: "There and Back Again" or "Making Life Easier by Swapping Out Preorder Tree Traversal for Postorder Tree Traversal"
 
 - Decouples cypher query construction from GraphQL query traversal.
 - Slightly modifies the order of operations in `resolveField()` in `graphql/execution/execute` to resolve subfields _before_ finalizing the resolution.
